@@ -26,7 +26,9 @@ import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.batch.item.xml.StaxEventItemReader;
+import org.springframework.batch.item.xml.StaxEventItemWriter;
 import org.springframework.batch.item.xml.builder.StaxEventItemReaderBuilder;
+import org.springframework.batch.item.xml.builder.StaxEventItemWriterBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -236,13 +238,40 @@ public class PersonasBatchConfiguration {
 				.build();
 	}
 	
+	// DB a XML
+	
+	public StaxEventItemWriter<Persona> personaXMLItemWriter() {
+		XStreamMarshaller marshaller = new XStreamMarshaller();
+		Map<String, Class> aliases = new HashMap<>();
+		aliases.put("Persona", Persona.class);
+		marshaller.setAliases(aliases);
+		return new StaxEventItemWriterBuilder<Persona>()
+				.name("personaXMLItemWriter")
+				.resource(new FileSystemResource("output/outputData.xml"))
+				.marshaller(marshaller)
+				.rootTagName("Personas")
+				.overwriteOutput(true)
+				.build();
+	}
+	
 	@Bean
-	public Job personasJob(PersonasJobListener listener, Step importXML2DBStep1) {
+	public Step exportDB2XMLStep(JdbcCursorItemReader<Persona> personaDBItemReader) {
+		return stepBuilderFactory.get("exportDB2XMLStep")
+				.<Persona, Persona>chunk(100)
+				.reader(personaDBItemReader)
+				.writer(personaXMLItemWriter())
+				.build();
+	}
+
+	@Bean
+	public Job personasJob(PersonasJobListener listener, Step importXML2DBStep1, Step exportDB2XMLStep, Step exportDB2CSVStep) {
 		return jobBuilderFactory
 				.get("personasJob")
 				.incrementer(new RunIdIncrementer())
-				.listener(listener)
+//				.listener(listener)
 				.start(importXML2DBStep1)
+				.next(exportDB2XMLStep)
+				.next(exportDB2CSVStep)
 				.build();
 	}
 
