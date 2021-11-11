@@ -2,6 +2,8 @@ package com.example.demo.batch;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.sql.DataSource;
 import org.springframework.batch.core.Job;
@@ -23,6 +25,8 @@ import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
 import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
+import org.springframework.batch.item.xml.StaxEventItemReader;
+import org.springframework.batch.item.xml.builder.StaxEventItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -30,11 +34,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.oxm.xstream.XStreamMarshaller;
 
 import com.example.demo.model.Persona;
 import com.example.demo.model.PersonaDTO;
 import com.example.demo.model.PhotoDTO;
 import com.example.demo.proxies.PhotoProxy;
+import com.thoughtworks.xstream.security.AnyTypePermission;
 
 @Configuration
 @EnableBatchProcessing
@@ -170,7 +176,8 @@ public class PersonasBatchConfiguration {
 	// Custom API REST ItemStream
 	
 	@Autowired private PhotoRestItemReader photoRestItemReader;
-	@Bean
+	
+	//@Bean
 	public Job photoJob() {
 		String[] headers = new String[] { "id", "author", "width", "height", "url", "download_url" };
 		return jobBuilderFactory
@@ -201,6 +208,42 @@ public class PersonasBatchConfiguration {
 							.build()
 					)
 					.build();
+	}
+
+	// XML a DB
+	
+	public StaxEventItemReader<PersonaDTO> personaXMLItemReader() {
+		XStreamMarshaller marshaller = new XStreamMarshaller();
+		Map<String, Class> aliases = new HashMap<>();
+		aliases.put("Persona", PersonaDTO.class);
+		marshaller.setAliases(aliases);
+		marshaller.setTypePermissions(AnyTypePermission.ANY);
+		return new StaxEventItemReaderBuilder<PersonaDTO>()
+				.name("personaXMLItemReader")
+				.resource(new ClassPathResource("Personas.xml"))
+				.addFragmentRootElements("Persona")
+				.unmarshaller(marshaller)
+				.build();
+	}
+	
+	@Bean
+	public Step importXML2DBStep1(JdbcBatchItemWriter<Persona> personaDBItemWriter) {
+		return stepBuilderFactory.get("importXML2DBStep1")
+				.<PersonaDTO, Persona>chunk(10)
+				.reader(personaXMLItemReader())
+				.processor(personaItemProcessor)
+				.writer(personaDBItemWriter)
+				.build();
+	}
+	
+	@Bean
+	public Job personasJob(PersonasJobListener listener, Step importXML2DBStep1) {
+		return jobBuilderFactory
+				.get("personasJob")
+				.incrementer(new RunIdIncrementer())
+				.listener(listener)
+				.start(importXML2DBStep1)
+				.build();
 	}
 
 }
