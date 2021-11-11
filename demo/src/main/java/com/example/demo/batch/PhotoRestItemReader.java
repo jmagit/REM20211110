@@ -28,13 +28,13 @@ public class PhotoRestItemReader implements ItemReader<PhotoDTO>, ItemStream {
 	@Override
 	public PhotoDTO read() {
 		// Esta es la buena
-		// return cache != null && cache.hasNext() ? cache.next() : null;
+		 return cache != null && cache.hasNext() ? cache.next() : null;
 		// Ejemplo de fallos
-		if(cache == null || !cache.hasNext()) return null;
-		PhotoDTO siguiente = cache.next();
-		if(siguiente.getId().endsWith("0"))
-			 throw new UnexpectedJobExecutionException("Fallo forzado: " + siguiente.toString());
-		return siguiente;
+//		if(cache == null || !cache.hasNext()) return null;
+//		PhotoDTO siguiente = cache.next();
+//		if(siguiente.getId().endsWith("0"))
+//			 throw new UnexpectedJobExecutionException("Fallo forzado: " + siguiente.toString());
+//		return siguiente;
 	}
 	@Override
 	public void update(ExecutionContext executionContext) throws ItemStreamException {
