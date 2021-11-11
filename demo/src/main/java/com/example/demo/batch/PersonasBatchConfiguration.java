@@ -8,6 +8,7 @@ import java.util.Map;
 import javax.sql.DataSource;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.UnexpectedJobExecutionException;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
@@ -177,9 +178,12 @@ public class PersonasBatchConfiguration {
 	
 	// Custom API REST ItemStream
 	
-	@Autowired private PhotoRestItemReader photoRestItemReader;
+	@Autowired 
+	private PhotoRestItemReader photoRestItemReader;
+	@Autowired 
+	private ItemFailureLoggerListener erroresListener;
 	
-	//@Bean
+	@Bean
 	public Job photoJob() {
 		String[] headers = new String[] { "id", "author", "width", "height", "url", "download_url" };
 		return jobBuilderFactory
@@ -188,6 +192,7 @@ public class PersonasBatchConfiguration {
 				.start(
 						stepBuilderFactory
 							.get("photoJobStep1")
+							.listener(erroresListener)
 							.<PhotoDTO, PhotoDTO>chunk(100)
 							.reader(photoRestItemReader)
 							.writer(
@@ -207,6 +212,9 @@ public class PersonasBatchConfiguration {
 									}})
 									.build()
 							)
+							.faultTolerant()
+                            .skipLimit(15)
+                            .skip(UnexpectedJobExecutionException.class)
 							.build()
 					)
 					.build();
@@ -263,7 +271,7 @@ public class PersonasBatchConfiguration {
 				.build();
 	}
 
-	@Bean
+	//@Bean
 	public Job personasJob(PersonasJobListener listener, Step importXML2DBStep1, Step exportDB2XMLStep, Step exportDB2CSVStep) {
 		return jobBuilderFactory
 				.get("personasJob")

@@ -2,6 +2,7 @@ package com.example.demo.batch;
 
 import java.util.Iterator;
 
+import org.springframework.batch.core.UnexpectedJobExecutionException;
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemStream;
@@ -26,7 +27,14 @@ public class PhotoRestItemReader implements ItemReader<PhotoDTO>, ItemStream {
 	
 	@Override
 	public PhotoDTO read() {
-		return cache != null && cache.hasNext() ? cache.next() : null;
+		// Esta es la buena
+		// return cache != null && cache.hasNext() ? cache.next() : null;
+		// Ejemplo de fallos
+		if(cache == null || !cache.hasNext()) return null;
+		PhotoDTO siguiente = cache.next();
+		if(siguiente.getId().endsWith("0"))
+			 throw new UnexpectedJobExecutionException("Fallo forzado: " + siguiente.toString());
+		return siguiente;
 	}
 	@Override
 	public void update(ExecutionContext executionContext) throws ItemStreamException {
